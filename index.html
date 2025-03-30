@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate Tic-Tac-Toe</title>
+    
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 10px;
+            min-height: 100vh;
+            overflow-x: hidden; /* Prevent horizontal scroll if confetti goes wide */
+        }
+
+        h1 {
+            margin-top: 10px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            width: 90vw; 
+            height: 90vw; 
+            max-width: 600px; 
+            max-height: 600px; 
+            min-width: 300px; 
+            min-height: 300px; 
+            aspect-ratio: 1 / 1; 
+            border: 3px solid black;
+            margin: 10px 0; 
+            background-color: #fff;
+            position: relative; /* Needed for potential confetti canvas positioning */
+            z-index: 1; /* Ensure board is behind confetti canvas if needed */
+        }
+
+        .large-cell {
+            border: 2px solid #555;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            position: relative; 
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .small-cell {
+            border: 1px solid #ccc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(1em, 5vw, 1.8em); 
+            cursor: pointer;
+            user-select: none; 
+            transition: background-color 0.2s ease;
+            font-weight: bold;
+        }
+
+        .small-cell:hover {
+            background-color: #eee;
+        }
+
+        /* Player marks */
+        .small-cell.X {
+            color: blue;
+            cursor: not-allowed;
+        }
+        .small-cell.O {
+            color: red;
+            cursor: not-allowed;
+        }
+        .small-cell.X:hover,
+        .small-cell.O:hover {
+            background-color: transparent; 
+        }
+
+        /* Highlighting active playable board */
+        .active-board {
+            background-color: #e0ffe0; 
+            box-shadow: inset 0 0 8px 1px green; 
+        }
+
+        /* Large cell overlay for wins/ties */
+        .large-cell-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(3em, 18vw, 8em);
+            font-weight: bold;
+            background-color: rgba(200, 200, 200, 0.75); 
+            pointer-events: none; 
+            visibility: hidden; 
+            opacity: 0;
+            transition: visibility 0s, opacity 0.3s linear;
+            line-height: 1; 
+        }
+
+        .large-cell-overlay.visible {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .large-cell-overlay.X { color: blue; }
+        .large-cell-overlay.O { color: red; }
+        .large-cell-overlay.TIE { color: gray; }
+        .large-cell-overlay.TIE::after {
+            content: "-"; 
+            font-size: clamp(3.5em, 20vw, 9em);
+        }
+        .large-cell-overlay.X::before { content: "X"; }
+        .large-cell-overlay.O::before { content: "O"; }
+
+
+        /* Status Area */
+        #status {
+            margin-top: 15px;
+            text-align: center;
+            font-size: clamp(1em, 4vw, 1.2em); 
+            width: 90%; 
+            max-width: 600px;
+        }
+        #status p { margin: 5px 0; }
+        
+        /* Styling for colored player indicator */
+        #current-player {
+            font-weight: bold;
+            display: inline-block; 
+            min-width: 1.1em; 
+            text-align: center;
+        }
+        #current-player.playerX { color: blue; }
+        #current-player.playerO { color: red; }
+
+        #winner-message {
+            font-weight: bold;
+            color: darkgreen;
+            min-height: 1.5em; 
+            margin-top: 10px;
+        }
+
+        button#reset-button {
+            margin-top: 20px;
+            margin-bottom: 20px; 
+            padding: 10px 20px;
+            font-size: clamp(0.9em, 3.5vw, 1em); 
+            cursor: pointer;
+            background-color: #4CAF50; 
+            border: none;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        button#reset-button:hover { background-color: #45a049; }
+
+        /* Disable clicks on non-playable cells */
+        .small-cell:not(.playable) { cursor: not-allowed; }
+        .small-cell:not(.playable):hover { background-color: transparent; }
+
+        /* Rules Section Styling */
+        #rules {
+            margin-top: 25px;
+            margin-bottom: 20px; 
+            padding: 15px;
+            background-color: #fff; 
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            max-width: 600px; 
+            width: 90%;
+            text-align: left;
+            font-size: clamp(0.8em, 3vw, 1em); 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #rules h2 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            text-align: center;
+            color: #333;
+            font-size: 1.2em;
+        }
+        #rules ul {
+            list-style: disc;
+            padding-left: 25px; 
+            margin-bottom: 0;
+            color: #555; 
+        }
+         #rules li {
+            margin-bottom: 8px; 
+            line-height: 1.4;
+        }
+
+        /* Styling for winning cells/lines */
+        .winning-cell {
+            background-color: #fffacd !important; /* Light yellow, !important to override hover */
+        }
+        .winning-large-cell {
+             /* Optional: Style the whole large cell if the game is won */
+        }
+
+    </style>
+
+</head>
+<body>
+    <h1>Ultimate Tic-Tac-Toe</h1>
+
+    <div id="game-board">
+        </div>
+
+    <div id="status">
+        <p>Current Turn: <span id="current-player">X</span></p> 
+        <p>Next Board: <span id="next-board-indicator">Any</span></p>
+        <p id="winner-message"></p>
+    </div>
+
+    <button id="reset-button">Reset Game</button>
+
+    <div id="rules">
+        <h2>How to Play</h2>
+        <ul>
+            <li>Win a small 3x3 board to claim the corresponding cell on the large board.</li>
+            <li>Win the large 3x3 board to win the game.</li>
+            <li>Your move in a small cell sends your opponent to the corresponding large board (e.g., playing in the top-right cell of a small board sends the opponent to the top-right large board).</li>
+            <li>If sent to a board that's already won or tied, you can play in <strong>any</strong> open cell on <strong>any</strong> undecided board.</li>
+        </ul>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM element references
+            const gameBoardElement = document.getElementById('game-board');
+            const statusPlayer = document.getElementById('current-player'); 
+            const statusNextBoard = document.getElementById('next-board-indicator');
+            const statusWinner = document.getElementById('winner-message');
+            const resetButton = document.getElementById('reset-button');
+
+            // Game state variables
+            let currentPlayer = 'X';
+            let smallBoardStates = Array(9).fill(null).map(() => Array(9).fill(null));
+            let largeBoardState = Array(9).fill(null);
+            let nextLargeBoardIndex = null;
+            let gameOver = false;
+
+            // Initializes or resets the game board and state
+            function initializeBoard() {
+                gameBoardElement.innerHTML = ''; 
+                statusWinner.textContent = '';
+                document.querySelectorAll('.winning-cell').forEach(el => el.classList.remove('winning-cell'));
+                document.querySelectorAll('.winning-large-cell').forEach(el => el.classList.remove('winning-large-cell'));
+
+                gameOver = false;
+                currentPlayer = 'X';
+                nextLargeBoardIndex = null; 
+                smallBoardStates = Array(9).fill(null).map(() => Array(9).fill(null));
+                largeBoardState = Array(9).fill(null);
+
+                // Create 9 large cells (small boards)
+                for (let i = 0; i < 9; i++) {
+                    const largeCell = document.createElement('div');
+                    largeCell.classList.add('large-cell');
+                    largeCell.dataset.largeIndex = i; 
+
+                    // Create 9 small cells within each large cell
+                    for (let j = 0; j < 9; j++) {
+                        const smallCell = document.createElement('div');
+                        smallCell.classList.add('small-cell');
+                        smallCell.dataset.largeIndex = i;
+                        smallCell.dataset.smallIndex = j; 
+                        smallCell.addEventListener('click', handleCellClick);
+                        largeCell.appendChild(smallCell);
+                    }
+
+                    // Create overlay for win/tie indicator
+                    const overlay = document.createElement('div');
+                    overlay.classList.add('large-cell-overlay');
+                    largeCell.appendChild(overlay); 
+
+                    gameBoardElement.appendChild(largeCell);
+                }
+                updateStatusDisplay(); 
+                highlightPlayableBoards(); 
+            }
+
+            // Handles clicks on the small cells
+            function handleCellClick(event) {
+                if (gameOver) return; 
+
+                const smallCell = event.target;
+                if (!smallCell.classList.contains('small-cell')) return; 
+                
+                const largeIndex = parseInt(smallCell.dataset.largeIndex);
+                const smallIndex = parseInt(smallCell.dataset.smallIndex);
+
+                // --- Input Validation ---
+                if (smallBoardStates[largeIndex][smallIndex]) return;
+                if (largeBoardState[largeIndex]) return; 
+                if (nextLargeBoardIndex !== null && largeIndex !== nextLargeBoardIndex) return;
+
+                // --- Make the Move ---
+                smallBoardStates[largeIndex][smallIndex] = currentPlayer;
+                smallCell.textContent = currentPlayer; 
+                smallCell.classList.add(currentPlayer); 
+                smallCell.classList.remove('playable');
+
+                // --- Check for Small Board Win/Tie ---
+                const smallBoardResult = checkWinner(smallBoardStates[largeIndex]); 
+                if (smallBoardResult) {
+                    if (smallBoardResult.winner !== 'TIE') { 
+                        largeBoardState[largeIndex] = smallBoardResult.winner; 
+                        markLargeBoard(largeIndex, smallBoardResult.winner);
+                        highlightWinningCells(largeIndex, smallBoardResult.combo); 
+
+                        // --- Check for Overall Game Win/Tie ---
+                        const gameResult = checkWinner(largeBoardState); 
+                        if (gameResult && gameResult.winner !== 'TIE') { // Check for overall win
+                            gameOver = true;
+                            statusWinner.textContent = `Player ${gameResult.winner} WINS!`;
+                            highlightWinningLargeCells(gameResult.combo); 
+                            highlightPlayableBoards(); 
+                            updateStatusDisplay();
+                            // *** Trigger Confetti on final win! ***
+                            triggerConfetti(); 
+                            return; // Game over - WIN
+                        } else if (gameResult && gameResult.winner === 'TIE') { 
+                            gameOver = true;
+                            statusWinner.textContent = "It's a TIE!";
+                            highlightPlayableBoards(); 
+                            updateStatusDisplay();
+                            return; // Game over - TIE
+                        }
+                    } else { // Small board is a TIE
+                        largeBoardState[largeIndex] = 'TIE';
+                        markLargeBoard(largeIndex, 'TIE');
+                        const gameResult = checkWinner(largeBoardState);
+                        if (gameResult && gameResult.winner === 'TIE') {
+                            gameOver = true;
+                            statusWinner.textContent = "It's a TIE!";
+                            highlightPlayableBoards(); 
+                            updateStatusDisplay();
+                            return; // Game over - TIE
+                        }
+                    }
+                }
+
+                // --- Determine the Next Board (only if game is not over) ---
+                const nextBoardDeterminedByIndex = smallIndex;
+                if (largeBoardState[nextBoardDeterminedByIndex]) {
+                    nextLargeBoardIndex = null; 
+                } else {
+                    nextLargeBoardIndex = nextBoardDeterminedByIndex; 
+                }
+
+                // --- Switch Player ---
+                currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+
+                // --- Update UI ---
+                updateStatusDisplay(); 
+                highlightPlayableBoards();
+            }
+
+            // Checks a 9-element array (board) for a win or tie
+            // Returns object { winner: 'X'/'O'/'TIE', combo: [indices] } or null
+            function checkWinner(boardState) {
+                const winningCombinations = [
+                    [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+                    [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+                    [0, 4, 8], [2, 4, 6]             // Diagonals
+                ];
+
+                for (const combo of winningCombinations) {
+                    const [a, b, c] = combo;
+                    if (boardState[a] && boardState[a] !== 'TIE' && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
+                        return { winner: boardState[a], combo: combo }; 
+                    }
+                }
+                if (boardState.every(cell => cell !== null)) {
+                    return { winner: 'TIE', combo: null }; 
+                }
+                return null; 
+            }
+
+            // Visually marks a large board as won or tied using the overlay
+            function markLargeBoard(largeIndex, winner) {
+                const largeCell = gameBoardElement.querySelector(`.large-cell[data-large-index="${largeIndex}"]`);
+                if (!largeCell) return; 
+                const overlay = largeCell.querySelector('.large-cell-overlay');
+                if (overlay) {
+                    overlay.className = 'large-cell-overlay';
+                    overlay.classList.add(winner); 
+                    overlay.classList.add('visible'); 
+                }
+                 const smallCells = largeCell.querySelectorAll('.small-cell');
+                 smallCells.forEach(sc => {
+                     sc.classList.remove('playable'); 
+                 });
+            }
+
+            // Updates the status text display (player turn, next board) and player color
+            function updateStatusDisplay() {
+                statusPlayer.textContent = currentPlayer;
+                let nextBoardText = "Any Open Board";
+                if (nextLargeBoardIndex !== null) {
+                    const boardNames = ["Top-Left", "Top-Middle", "Top-Right", 
+                                        "Middle-Left", "Center", "Middle-Right", 
+                                        "Bottom-Left", "Bottom-Middle", "Bottom-Right"];
+                    if(nextLargeBoardIndex >= 0 && nextLargeBoardIndex < boardNames.length) {
+                         nextBoardText = `${boardNames[nextLargeBoardIndex]} Board`;
+                    } else {
+                         nextBoardText = `Board #${nextLargeBoardIndex + 1}`;
+                    }
+                }
+                if (gameOver) {
+                    nextBoardText = "Game Over";
+                }
+                statusNextBoard.textContent = nextBoardText;
+
+                // Update Color
+                if (!gameOver) { 
+                    statusPlayer.className = ''; 
+                    if (currentPlayer === 'X') {
+                        statusPlayer.classList.add('playerX');
+                    } else {
+                        statusPlayer.classList.add('playerO');
+                    }
+                } else {
+                    statusPlayer.className = ''; 
+                }
+            }
+
+            // Updates the visual highlighting of playable boards and cells
+            function highlightPlayableBoards() {
+                document.querySelectorAll('.large-cell').forEach(lc => lc.classList.remove('active-board'));
+                document.querySelectorAll('.small-cell').forEach(sc => sc.classList.remove('playable'));
+
+                if (gameOver) return; 
+
+                if (nextLargeBoardIndex === null) {
+                    for (let i = 0; i < 9; i++) {
+                        if (!largeBoardState[i]) { 
+                            const largeCell = gameBoardElement.querySelector(`.large-cell[data-large-index="${i}"]`);
+                            if (largeCell) {
+                                largeCell.classList.add('active-board');
+                                const smallCells = largeCell.querySelectorAll('.small-cell');
+                                smallCells.forEach((sc, si) => {
+                                    if (!smallBoardStates[i][si]) { 
+                                        sc.classList.add('playable');
+                                    }
+                                });
+                            }
+                        }
+                    }
+                } else {
+                    if (!largeBoardState[nextLargeBoardIndex]) {
+                        const activeLargeCell = gameBoardElement.querySelector(`.large-cell[data-large-index="${nextLargeBoardIndex}"]`);
+                        if (activeLargeCell) {
+                            activeLargeCell.classList.add('active-board');
+                            const smallCells = activeLargeCell.querySelectorAll('.small-cell');
+                            smallCells.forEach((sc, si) => {
+                                if (!smallBoardStates[nextLargeBoardIndex][si]) { 
+                                    sc.classList.add('playable');
+                                }
+                            });
+                        }
+                    } else {
+                         console.warn(`Directed to already decided board ${nextLargeBoardIndex + 1}. Allowing play in any open board.`);
+                         nextLargeBoardIndex = null;
+                         highlightPlayableBoards(); 
+                    }
+                }
+            }
+
+            // Adds highlight class to the winning small cells
+            function highlightWinningCells(largeBoardIdx, comboIndices) {
+                const largeCell = gameBoardElement.querySelector(`.large-cell[data-large-index="${largeBoardIdx}"]`);
+                if (!largeCell || !comboIndices) return; 
+                comboIndices.forEach(smallIdx => {
+                    const smallCell = largeCell.querySelector(`.small-cell[data-small-index="${smallIdx}"]`);
+                    if (smallCell) {
+                        smallCell.classList.add('winning-cell');
+                    }
+                });
+            }
+
+            // Adds highlight class to the winning large cells (optional visual cue)
+            function highlightWinningLargeCells(comboIndices) {
+                if (!comboIndices) return; 
+                comboIndices.forEach(largeIdx => {
+                    const largeCell = gameBoardElement.querySelector(`.large-cell[data-large-index="${largeIdx}"]`);
+                    if (largeCell) {
+                        largeCell.classList.add('winning-large-cell');
+                    }
+                });
+            }
+
+            // Triggers the confetti animation
+            function triggerConfetti() {
+                // Ensure confetti function exists (library loaded)
+                if (typeof confetti !== 'function') {
+                    console.warn("Confetti library not loaded.");
+                    return;
+                }
+
+                // Simple central burst
+                confetti({
+                    particleCount: 150,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
+
+                // Add a little extra flair - fireworks style
+                const duration = 2 * 1000; // 2 seconds
+                const animationEnd = Date.now() + duration;
+                const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 }; // Ensure confetti is on top
+
+                function randomInRange(min, max) {
+                    return Math.random() * (max - min) + min;
+                }
+
+                const interval = setInterval(function() {
+                    const timeLeft = animationEnd - Date.now();
+
+                    if (timeLeft <= 0) {
+                        return clearInterval(interval);
+                    }
+
+                    const particleCount = 50 * (timeLeft / duration);
+                    // Launch confetti from two points near the bottom corners
+                    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+                    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+                }, 250);
+            }
+
+
+            // --- Initialization ---
+            resetButton.addEventListener('click', initializeBoard);
+            initializeBoard(); 
+        });
+    </script>
+
+</body>
+</html>
